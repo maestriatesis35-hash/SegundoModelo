@@ -650,8 +650,146 @@ const WARR = ["Condiciones físicas del trabajo", "Libertad para elegir tu propi
 // colores de la escala 1-7: de muy insatisfecho (rojo) a muy satisfecho (verde), con el punto neutro en gris
 const WCOL = ["#DC2626", "#EA580C", "#F59E0B", "#94A3B8", "#84CC16", "#22C55E", "#15803D"];
 const WARR_L = ["Muy insatisfecho", "Insatisfecho", "Moderadamente insatisfecho", "Ni satisfecho ni insatisfecho", "Moderadamente satisfecho", "Satisfecho", "Muy satisfecho"];
-const COPSOQ_DIMS = [["exig", "Exigencias psicológicas", 7], ["dp", "Conflicto trabajo-familia (doble presencia)", 3], ["ctrl", "Control sobre el trabajo", 5], ["apoyo", "Apoyo social y calidad de liderazgo", 7], ["comp", "Compensaciones", 5], ["capital", "Capital social", 4]];
-const COPSOQ_L = ["Siempre", "Muchas veces", "Algunas veces", "Solo alguna vez", "Nunca"];
+/* CENSOPAS-COPSOQ, versión media (Revisar.pdf). Las preguntas 1, 2, 4.a, 5.a, 10 y 19 no se aplican porque ya están en la ficha (sexo, edad, condición, área, tiempo en actividad asistencial y horas por semana).
+   COPSOQ_FICHA se muestra en la ficha sociodemográfica y laboral; COPSOQ, en el paso CENSOPAS-COPSOQ. n = número; o = alternativas; multi = varias respuestas; sub = ítems de una tabla con la misma escala */
+const COPSOQ_PREOC = ["Estoy muy preocupado", "Estoy bastante preocupado", "Estoy más o menos preocupado", "Estoy un poco preocupado", "No estoy preocupado"];
+const COPSOQ_PUESTOS = ["Médicos", "Técnicos asistenciales", "Enfermera", "Admisionista", "Tecnólogo laboratorio", "Nutricionista", "Psicólogo", "Administrador", "Cajero", "Director"];
+const COPSOQ_AREAS = ["Recursos Humanos", "Emergencia", "Hospitalización", "Consulta Externa", "Admisión"];
+const COPSOQ_FREC = ["Siempre", "Muchas veces", "Algunas veces", "Sólo alguna vez", "Nunca"];
+const COPSOQ_DIAS = d => ["Ninguno", "Alguno excepcionalmente", `Un ${d} al mes`, `Dos ${d}s`, `Tres o más ${d}s al mes`];
+const COPSOQ_FICHA = [
+    { n: "3", t: "¿Qué nivel de instrucción aprobaste?", o: ["Técnico superior incompleta", "Técnico superior completa", "Superior universitario incompleta", "Superior universitario completa"] },
+    { n: "4b", t: "En los últimos 12 meses, ¿en qué puestos has trabajado? (Elige los puestos; si no has cambiado de puesto, marca la última opción).", o: [...COPSOQ_PUESTOS, "No he cambiado de puesto"], multi: 1 },
+    { n: "5b", t: "En los últimos 12 meses, ¿en qué áreas has trabajado? (Elige las áreas; si no has cambiado de área, marca la última opción).", o: [...COPSOQ_AREAS, "No he cambiado de área"], multi: 1 },
+    { n: "6", t: "¿Qué tipo de contrato laboral tienes?", o: ["Soy fijo (plazo indeterminado, indefinido, nombrado)", "Soy temporal (contrato administrativo de servicio (CAS): por inicio de actividad / por necesidades de mercado / por conversión empresarial)", "Soy funcionario/directivo"] },
+    { n: "7", t: "¿Realizas tareas adicionales distintas a tu puesto de trabajo?", o: ["Sí, generalmente de mayor responsabilidad", "Sí, generalmente de menor responsabilidad", "Sí, generalmente del mismo nivel de responsabilidad", "Todas las anteriores", "Generalmente no", "No lo sé"] },
+    { n: "8", t: "En el último año, ¿tus jefes te han consultado sobre cómo mejorar la forma de realizar tu trabajo?", o: COPSOQ_FREC },
+    { n: "9", t: "¿El pago que recibes corresponde al puesto de trabajo que ocupas?", o: ["No lo sé", "Sí", "No, el trabajo que hago es de mayor responsabilidad al pago que recibo", "No, el trabajo que hago es de menor responsabilidad al pago que recibo"] },
+    { n: "11", t: "Considerando el tiempo que llevas en esta empresa o institución, ¿has ascendido de puesto?", o: ["No", "Sí, una vez", "Sí, dos veces", "Sí, tres o más veces"] },
+    { n: "12", t: "Al mes, ¿cuántos sábados trabajas?", o: COPSOQ_DIAS("sábado") },
+    { n: "13", t: "Al mes, ¿cuántos domingos trabajas?", o: COPSOQ_DIAS("domingo") },
+    { n: "14", t: "¿Cuál es tu horario de trabajo?", o: ["Rotatorios (excepto noche)", "Rotatorios (incluido noche)", "Fijo mañana", "Fijo tarde"] },
+    { n: "15", t: "¿Tienes tolerancia en la hora de entrada y salida?", o: ["No, no tengo ningún margen de tolerancia en relación con la hora de entrada y salida", "No, porque no tengo horario", "Sí, puedo elegir entre varios horarios fijos ya establecidos", "Sí, tengo hasta 30 minutos de tolerancia", "Sí, tengo más de media hora y hasta una hora de tolerancia", "Sí, tengo más de una hora de tolerancia"] },
+    { n: "16", t: "Si tienes algún asunto personal o familiar, ¿puedes dejar tu puesto de trabajo al menos una hora?", o: COPSOQ_FREC },
+    { n: "17", t: "¿Te cambian la hora de entrada y salida o los días que tienes establecido trabajar?", o: COPSOQ_FREC },
+    { n: "18", t: "Durante tu jornada laboral, ¿puedes decidir en qué momento haces un descanso?", o: COPSOQ_FREC },
+    { n: "20", t: "Generalmente, ¿cuántos días al mes trabajas más de media hora después de tu jornada laboral?", o: ["Ninguno", "Algún día excepcionalmente", "De 1 a 5 días al mes", "De 6 a 10 días al mes", "Más de 11 días al mes"] },
+    { n: "21", t: "Teniendo en cuenta la cantidad de trabajo que tienes que realizar y el tiempo asignado, ¿dirías que…?", o: COPSOQ_FREC, sub: [
+      ["a", "En tu área, ¿falta personal?"],
+      ["b", "¿La planificación (organización del trabajo) está de acuerdo con la realidad de tu trabajo?"],
+      ["c", "¿La tecnología (máquinas, herramientas, equipos de cómputo) con la que trabajas es la adecuada y funciona correctamente?"]] },
+    { n: "22", t: "Tu sueldo es:", o: ["Fijo", "Todo variable (a destajo, a comisión, por producción, jornal…)", "Una parte fija y otra variable"] },
+    { n: "23", t: "Aproximadamente, ¿cuánto cobras al mes?", o: ["Sin ingresos", "Hasta 930 soles", "De 931 a 1700 soles", "De 1701 a 2550 soles", "De 2551 a 3400 soles", "De 3401 a 4250 soles", "De 4251 a 5100 soles", "De 5101 a 5950 soles", "Más de 5951 soles"] },
+    { n: "24", t: "¿Qué parte de las tareas familiares y domésticas haces?", o: ["Soy el principal responsable y hago la mayor parte de tareas familiares y domésticas", "Hago aproximadamente la mitad de las tareas familiares y domésticas", "Hago la cuarta parte de las tareas familiares y domésticas", "Sólo hago tareas específicas", "No hago ninguna o casi ninguna de estas tareas"] }
+];
+const COPSOQ = [
+  { s: "Exigencias y contenidos de tu trabajo", q: [
+    { n: "25", t: "Las siguientes preguntas tratan sobre EXIGENCIAS Y CONTENIDOS DE TU TRABAJO.", o: COPSOQ_FREC, sub: [
+      ["a", "¿Tienes que trabajar muy rápido?"],
+      ["b", "¿Se producen en tu trabajo momentos o situaciones emocionalmente desgastadoras?"],
+      ["c", "¿Te retrasas en la entrega de tu trabajo?"],
+      ["d", "¿Tu trabajo exige que calles tu opinión?"],
+      ["e", "¿La distribución de tareas es irregular y provoca que se te acumule o junte el trabajo?"],
+      ["f", "¿Tu trabajo exige que trates a todas las personas por igual, aunque no tengas ganas?"],
+      ["g", "¿Tienes tiempo suficiente para hacer tu trabajo?"],
+      ["h", "¿Tú decides sobre el ritmo con el que trabajas?"],
+      ["i", "¿Influyes en las decisiones acerca de tu trabajo?"],
+      ["j", "¿Influyes en la forma de realizar tu trabajo?"],
+      ["k", "¿Influyes sobre qué haces en el trabajo?"],
+      ["l", "¿Hay momentos en los que necesitas estar en tu trabajo y en tu casa a la vez?"],
+      ["m", "¿Sientes que tu trabajo te genera tanto cansancio que perjudica tus actividades domésticas y familiares?"],
+      ["n", "¿Sientes que tu trabajo te ocupa tanto tiempo que perjudica tus tareas domésticas y familiares?"],
+      ["o", "¿Piensas en tus tareas domésticas y familiares cuando estás trabajando?"],
+      ["p", "¿Te resulta imposible acabar tus actividades laborales?"],
+      ["q", "¿En tu trabajo tienes que preocuparte o prestar atención a los problemas personales de otros?"]] },
+    { n: "26", t: "Continuando con las EXIGENCIAS Y CONTENIDOS DE TU TRABAJO.", o: COPSOQ_FREC, sub: [
+      ["a", "¿Tu trabajo necesita que tengas iniciativa?"],
+      ["b", "¿Las tareas que haces tienen sentido para ti?"],
+      ["c", "¿Las tareas que haces te parecen importantes?"],
+      ["d", "¿Tu trabajo te afecta emocionalmente (en forma negativa)?"],
+      ["e", "¿Tu trabajo permite que aprendas cosas nuevas?"],
+      ["f", "¿Debes mantener un alto ritmo de trabajo durante tu jornada laboral?"],
+      ["g", "¿Te sientes comprometido con tu trabajo?"],
+      ["h", "¿Tu trabajo te da la oportunidad de mejorar tus conocimientos y habilidades?"],
+      ["i", "¿Tu trabajo es emocionalmente desgastador?"],
+      ["j", "¿Tu trabajo exige que guardes tus emociones y sentimientos?"],
+      ["k", "¿Te exigen en el trabajo ser amable con todas las personas sin importar cómo te traten?"],
+      ["l", "¿Tu trabajo permite que apliques tus habilidades, destrezas y conocimientos?"],
+      ["m", "¿El ritmo de trabajo es alto durante toda la jornada?"]] }] },
+  { s: "Cómo se definen tus tareas", q: [
+    { n: "27", t: "Las siguientes preguntas tratan de CÓMO SE DEFINEN TUS TAREAS.", o: COPSOQ_FREC, sub: [
+      ["a", "¿En tu trabajo se te informa con suficiente anticipación de los cambios, decisiones importantes y proyectos a futuro?"],
+      ["b", "¿Tu trabajo tiene objetivos claros?"],
+      ["c", "¿Se te exigen cosas contradictorias en el trabajo?"],
+      ["d", "¿Sabes exactamente qué tareas son de tu responsabilidad?"],
+      ["e", "¿Recibes toda la información que necesitas para realizar bien tu trabajo?"],
+      ["f", "¿Haces cosas en el trabajo que son aceptadas por algunas personas y no por otras?"],
+      ["g", "¿Sabes exactamente qué se espera de ti en el trabajo?"],
+      ["h", "¿Sabes exactamente qué margen de autonomía tienes al realizar tu trabajo?"],
+      ["i", "¿Tienes que hacer tareas que crees que deberían hacerse de otra manera?"],
+      ["j", "¿Tienes que realizar tareas que te parecen innecesarias?"]] }] },
+  { s: "Apoyo que recibes en el trabajo", q: [
+    { n: "28", t: "Las siguientes preguntas tratan del APOYO QUE RECIBES EN EL TRABAJO.", o: COPSOQ_FREC, sub: [
+      ["a", "¿Recibes ayuda y apoyo de tus compañeros y compañeras en la realización de tu trabajo?"],
+      ["b", "¿Tus compañeros y compañeras están dispuestos a escuchar tus problemas de trabajo?"],
+      ["c", "¿Tus compañeros y compañeras hablan contigo sobre cómo haces tu trabajo?"],
+      ["d", "¿Tienes un buen ambiente laboral con tus compañeros y compañeras de trabajo?"],
+      ["e", "¿En tu trabajo sientes que formas parte de un grupo o equipo de trabajo?"],
+      ["f", "¿Se ayudan entre compañeros y compañeras en el trabajo?"],
+      ["g", "¿Tu jefe inmediato está dispuesto a escuchar tus problemas del trabajo?"],
+      ["h", "¿Recibes ayuda y apoyo de tu jefe inmediato en la realización de tu trabajo?"],
+      ["i", "¿Tu jefe inmediato habla contigo acerca de cómo haces tu trabajo?"]] }] },
+  { s: "Inseguridad sobre las condiciones de trabajo", q: [
+    { n: "29", t: "Estas preguntas se refieren a cuánto te preocupan ACTUALMENTE LOS POSIBLES CAMBIOS EN TUS CONDICIONES DE TRABAJO.", o: COPSOQ_PREOC, sub: [
+      ["a", "¿Estás preocupado/a por si te trasladan a otro centro de trabajo, área, departamento o sección en contra de tu voluntad?"],
+      ["b", "¿Estás preocupado/a por si te cambian el horario (turno, días de la semana, horas de entrada y salida…) contra tu voluntad?"],
+      ["c", "¿Estás preocupado/a por si te cambian de tareas contra tu voluntad?"],
+      ["d", "¿Estás preocupado/a por si te despiden o no te renuevan el contrato?"],
+      ["e", "¿Estás preocupado/a por si te varían el sueldo o pago (que no te lo actualicen, que te lo bajen, que introduzcan el salario variable, que te paguen en especies, etc.)?"],
+      ["f", "¿Estás preocupado/a por lo difícil que sería encontrar otro trabajo en el caso de que te quedases sin trabajo?"]] }] },
+  { s: "Reconocimiento, confianza y justicia", q: [
+    { n: "30", t: "Las siguientes preguntas se refieren al RECONOCIMIENTO, LA CONFIANZA Y LA JUSTICIA EN TU LUGAR DE TRABAJO.", o: COPSOQ_FREC, sub: [
+      ["a", "¿Tu trabajo es valorado por la gerencia, la dirección o la jefatura?"],
+      ["b", "¿La gerencia, la dirección o la jefatura te respeta?"],
+      ["c", "¿Recibes un trato justo de la gerencia, la dirección o la jefatura?"],
+      ["d", "¿La gerencia, la dirección o la jefatura confía en que sus trabajadores hacen bien su trabajo?"],
+      ["e", "¿Puedes confiar en la información que viene de la gerencia, la dirección o la jefatura?"],
+      ["f", "¿Se solucionan los conflictos de una manera justa?"],
+      ["g", "¿Se te reconoce por el trabajo bien hecho?"],
+      ["h", "¿La gerencia, la dirección o la jefatura considera con la misma seriedad las propuestas procedentes de todos los trabajadores?"],
+      ["i", "¿Los trabajadores pueden expresar sus opiniones y emociones?"],
+      ["j", "¿Se distribuyen las tareas de una forma justa?"],
+      ["k", "¿Tu actual jefe inmediato se asegura de que cada uno de los trabajadores tenga buenas oportunidades de desarrollo laboral?"],
+      ["l", "¿Tu actual jefe inmediato planifica bien el trabajo?"],
+      ["m", "¿Tu actual jefe inmediato distribuye bien el trabajo?"],
+      ["n", "¿Tu actual jefe inmediato resuelve bien los conflictos laborales?"]] }] },
+  { s: "II. Las siguientes preguntas tratan de tu SALUD, BIENESTAR Y SATISFACCIÓN", q: [
+    { n: "31", t: "En general, ¿dirías que tu salud es…?", o: ["Excelente", "Muy buena", "Buena", "Regular", "Mala"] },
+    { n: "32", t: "DURANTE LAS ÚLTIMAS CUATRO SEMANAS, ¿con qué frecuencia has tenido los siguientes problemas?", o: COPSOQ_FREC, sub: [
+      ["a", "¿Te has sentido agotado?"],
+      ["b", "¿Te has sentido emocionalmente agotado?"],
+      ["c", "¿Te has sentido físicamente agotado?"],
+      ["d", "¿Has estado cansado?"],
+      ["e", "¿Has tenido problemas para relajarte?"],
+      ["f", "¿Has estado irritable?"],
+      ["g", "¿Has estado tenso/a?"],
+      ["h", "¿Has estado estresado/a?"]] },
+    { n: "33", t: "Continuando con cómo te has sentido DURANTE LAS CUATRO ÚLTIMAS SEMANAS.", o: COPSOQ_FREC, sub: [
+      ["a", "¿Has estado muy nervioso/a?"],
+      ["b", "¿Te has sentido con la moral tan baja que nada podía animarte?"],
+      ["c", "¿Te has sentido calmado y tranquilo?"],
+      ["d", "¿Te has sentido desanimado y triste?"],
+      ["e", "¿Te has sentido feliz?"]] },
+    { n: "34", t: "¿Cuál es tu grado de satisfacción en relación con tu trabajo, tomándolo todo en consideración?", o: ["Muy satisfecho/a", "Satisfecho/a", "Insatisfecho/a", "Muy insatisfecho/a"] }] }
+];
+// lista plana de respuestas: k = clave en m2.copsoq; n = número visible; t = texto completo (enunciado + ítem)
+const COPSOQ_ITEMS = [...COPSOQ_FICHA, ...COPSOQ.flatMap(s => s.q)].flatMap(x => x.sub ? x.sub.map(([l, t]) => ({ k: `p${x.n}${l}`, n: `${x.n}.${l}`, t, o: x.o })) : [{ k: "p" + x.n, n: x.n, t: x.t, o: x.o, multi: x.multi }]);
+const copsoqVal = (r, it) => { const v = r.m2?.copsoq?.[it.k]; return it.multi ? Object.entries(v || {}).filter(([, b]) => b).map(([o]) => o).join(" | ") : v ?? ""; };
+// una pregunta del CENSOPAS-COPSOQ (con su número original); las de tabla se muestran como ítems con la misma escala
+const copsoqQ = (x, pre = "") => { const P = "m2.copsoq.";
+  return x.sub ? `<p class="hint" style="margin:16px 0 4px"><b>${pre}${x.n}. ${esc(x.t)}</b></p>${x.sub.map(([l, t]) => q(`${pre}${x.n}.${l}) ${esc(t)}`, radio(P + "p" + x.n + l, x.o, "likert l5 opts"), 1)).join("")}`
+    : q(`${pre}${x.n.replace(/^(\d+)([a-z])$/, "$1.$2")}. ${esc(x.t)}`, x.multi ? `<div class="opts">${x.o.map(o => check(`${P}p${x.n}.${o}`, o)).join("")}</div>` : radio(P + "p" + x.n, x.o), 1); };
+const copsoqFalt = r => COPSOQ_ITEMS.filter(it => copsoqVal(r, it) === "").length;
 const REGIONS = [["cuello", "Cuello", 0], ["hombros", "Hombros", 1], ["codos", "Codos", 1], ["munecas", "Muñecas/manos", 1], ["dorsal", "Espalda dorsal (alta)", 0], ["lumbar", "Espalda lumbar (baja)", 0], ["caderas", "Caderas/muslos", 0], ["rodillas", "Rodillas", 0], ["tobillos", "Tobillos/pies", 0]];
 
 /* REBA (Hignett y McAtamney, 2000; niveles según NTP 601 del INSST). Verificar con la hoja oficial del Anexo 5. */
@@ -716,7 +854,7 @@ function bodyMap(sel) {
 }
 
 /* =================== Estado =================== */
-let S = { settings: LS.get("settings", { encuestador: "", copsoqItems: null }), rec: null, step: 0, view: "start", slide: 0 };
+let S = { settings: LS.get("settings", { encuestador: "" }), rec: null, step: 0, view: "start", slide: 0 };
 const blankRecord = () => ({ code: "", estrato: "", encuestador: S.settings.encuestador, createdAt: now(), status: "nuevo", sent: false,
   eleg: {}, consent: {}, m1: { tasks: [{}, {}], ocra: { der: {}, izq: {} }, ptai: { aplica: "", transfers: [{ crit: {} }], int: {} }, nasa: {} },
   m2: { ficha: {}, copsoq: {}, warr: {}, pausa: {}, nordico: {}, modulo: {} } });
@@ -858,14 +996,8 @@ function bindHome() {
 }
 
 function configView() {
-  const it = S.settings.copsoqItems;
   return `<div class="view"><div class="card"><button class="iconbtn" id="homeBtn" aria-label="Inicio">${ms("home")}</button><h2 style="margin-top:10px">Configuración</h2>
   <label class="f req">Nombre del encuestador/evaluador</label><input type="text" id="encName" value="${esc(S.settings.encuestador)}">
-  <h3 style="margin-top:20px">Ítems oficiales del CENSOPAS-COPSOQ (versión corta)</h3>
-  <p class="hint">La redacción oficial de los 31 ítems se obtendrá del INS-CENSOPAS. Cárguela como archivo JSON con el formato:
-  <span class="kbd">{"exig":["ítem 1",…7], "dp":[…3], "ctrl":[…5], "apoyo":[…7], "comp":[…5], "capital":[…4]}</span></p>
-  <p>${it ? '<span class="badge b-ok">Ítems cargados (' + Object.values(it).flat().length + ')</span>' : '<span class="badge b-warn">Pendiente: aún no se han cargado los ítems oficiales</span>'}</p>
-  <input type="file" id="copsoqFile" accept="application/json">
   <h3 style="margin-top:20px">Google Sheets y Drive</h3>
   <p class="hint">Enlace de la aplicación web de Apps Script (termina en <span class="kbd">/exec</span>). Ver <span class="kbd">apps-script/LEEME.md</span>.</p>
   <div style="display:flex;gap:8px"><input type="text" id="gsUrl" value="${esc(gsUrl())}" placeholder="https://script.google.com/macros/s/…/exec" inputmode="url" autocapitalize="off" spellcheck="false">
@@ -875,8 +1007,6 @@ function configView() {
 }
 function bindConfig() {
   $("#homeBtn").onclick = () => { S.view = "home"; render(); };
-  $("#copsoqFile").onchange = async e => { try { const j = JSON.parse(await e.target.files[0].text()); const ok = COPSOQ_DIMS.every(([k, , n]) => Array.isArray(j[k]) && j[k].length === n);
-    if (!ok) return toast("El archivo no tiene 7/3/5/7/5/4 ítems por dimensión"); S.settings.copsoqItems = j; LS.set("settings", S.settings); toast("Ítems cargados"); render(); } catch { toast("Archivo JSON no válido"); } };
   $("#gsTest").onclick = async () => { const m = $("#gsTestMsg"), prev = S.settings.gsUrl; S.settings.gsUrl = $("#gsUrl").value.trim(); m.textContent = "Probando…";
     try { const j = await gsCall({ action: "estado" }); m.textContent = j.configurado ? "Conectado: la base de datos responde." : "El servidor responde, pero falta ejecutar configurar() en Apps Script."; }
     catch (e) { m.textContent = "No se pudo conectar: " + e.message; } finally { S.settings.gsUrl = prev; } };
@@ -976,6 +1106,7 @@ const STEP_VIEWS = {
     ${q("4. Peso (kg)", input(F + "peso", "number", 'step="0.1" inputmode="decimal"'), 1)}${q("5. Talla (m)", input(F + "talla", "number", 'step="0.01" min="1" max="2.3" placeholder="Ej.: 1.65" inputmode="decimal"'), 1)}</div>
     <div id="imc" class="hint"></div>
     ${q("6. Mano dominante", radio(F + "mano", ["Diestro/a", "Zurdo/a", "Ambidiestro/a"]), 1)}
+    ${copsoqQ(COPSOQ_FICHA[0], "C")}
     ${q("7. Condición", `<span class="badge b-info">${esc(est || "—")}</span> <span class="hint">(registrada en la elegibilidad)</span>`)}
     ${q(est === "Interno" ? "8. Fecha de inicio del internado" : "8. Año de egreso", est === "Interno" ? input(F + "inicioInternado", "date") : input(F + "anioEgreso", "number", 'min="2020" max="2025"'), 1)}
     ${q("9. Sede o centro asistencial donde realiza su actividad", input(F + "sede"), 1)}
@@ -997,18 +1128,18 @@ const STEP_VIEWS = {
     ${q("20. ¿Dispone de ayudas mecánicas (grúa, tabla de transferencia, camilla regulable) para movilizar pacientes?", sino(F + "ayudas"), 1)}
     ${q("21. ¿Ha recibido capacitación en ergonomía o mecánica corporal en el último año?", sino(F + "capacitacion"), 1)}
     ${q("21a. En su jornada habitual, ¿realiza transferencias o movilización de pacientes dependientes?", sino(F + "transfiere"), 1)}
+    <h3 style="margin-top:18px">Condiciones de empleo (CENSOPAS-COPSOQ)</h3><p class="hint">Preguntas del CENSOPAS-COPSOQ sobre tu empleo actual; se conserva su numeración original con la letra C (C3 a C24).</p>
+    ${COPSOQ_FICHA.slice(1).map(x => copsoqQ(x, "C")).join("")}
     <h3 style="margin-top:18px">III. Antecedentes y hábitos</h3>
     ${q("22. ¿Cuántos días a la semana realiza actividad física o deporte durante al menos 30 minutos?", input(F + "actFisica", "number", 'min="0" max="7" inputmode="numeric"'), 1)}
     ${q("23. ¿Tiene alguna de las siguientes enfermedades diagnosticadas por un médico?", `<div class="opts">${["Ninguna", "Artritis reumatoide", "Lupus eritematoso sistémico", "Espondiloartritis", "Fibromialgia", "Hernia discal", "Otra"].map(o => check(F + "enf." + o, o)).join("")}</div>`, 1)}
     ${getPath(S.rec, F + "enf.Otra") ? q("¿Cuál?", input(F + "enfOtra")) : ""}
     ${q("24. En los últimos 12 meses, ¿ha sufrido algún traumatismo fuera del trabajo que le haya causado dolor musculoesquelético?", sino(F + "trauma"), 1)}
     ${getPath(S.rec, F + "trauma") === "si" ? q("Región afectada", input(F + "traumaReg")) : ""}</div>`; },
-  copsoq() { const it = S.settings.copsoqItems;
-    if (!it) return `<div class="card"><h2>CENSOPAS-COPSOQ (versión corta, 31 ítems)</h2>
-      <div class="note">Los ítems oficiales aún no se han cargado (se obtendrán del INS-CENSOPAS). Cárguelos en <b>Configuración</b>. Puede continuar y completar esta sección después: quedará como <b>pendiente</b>.</div>
-      <table class="tbl" style="margin-top:12px"><tr><th>Dimensión</th><th>Ítems</th><th>Uso</th></tr>${COPSOQ_DIMS.map(([, n, c], i) => `<tr><td>${n}</td><td>${c}</td><td>${i < 4 ? "Exposición principal" : "Descriptiva"}</td></tr>`).join("")}</table></div>`;
-    let k = 0; return `<div class="card"><h2>CENSOPAS-COPSOQ</h2><p class="hint">Marque una alternativa por pregunta, pensando en su actividad asistencial habitual.</p>
-      ${COPSOQ_DIMS.map(([d, n]) => `<h3 style="margin-top:16px">${n}</h3>${it[d].map((txt, i) => { k++; return q(`${k}. ${esc(txt)}`, radio(`m2.copsoq.${d}_${i}`, COPSOQ_L.map(l => [l, l]), "likert l5 opts"), 1); }).join("")}`).join("")}</div>`; },
+  copsoq() {
+    return `<div class="card"><h2>CENSOPAS-COPSOQ (versión media)</h2>
+      <div class="note info">Este cuestionario sirve para evaluar los riesgos psicosociales en el trabajo, es decir, las condiciones de la organización del trabajo que pueden representar un riesgo para la salud en tu puesto actual. Es <b>confidencial y anónimo</b>: responde de forma individual y sincera. Marca <b>una sola opción</b> por pregunta y contesta <b>todas</b> las preguntas. Los datos generales y de empleo del cuestionario (preguntas 3 a 24) se respondieron en la ficha.</div>
+      ${COPSOQ.map(s => `<h3 style="margin-top:20px">${s.s}</h3>${s.q.map(copsoqQ).join("")}`).join("")}</div>`; },
   warr() { const interno = S.rec.estrato === "Interno";
     return `<div class="card"><h2>Escala General de Satisfacción (Warr, Cook y Wall)</h2>
     <p class="hint">Indique cómo se siente respecto a cada aspecto de su trabajo actual.${interno ? " En los ítems 7, 10 y 15 puede marcar «No aplica» si no corresponde a su situación de interno." : ""}</p>
@@ -1089,10 +1220,10 @@ function completeness(r) {
   const ptaiOk = r.m1.ptai.aplica === "no" || (r.m1.ptai.aplica === "si" && r.m1.ptai.int.abc0 && r.m1.ptai.int.abc1);
   const f = r.m2.ficha || {}; const fichaReq = ["edad", "sexo", "peso", "talla", "mano", "sede", "area", "horasDia", "diasSemana", "pacientesDia", "pausasN", "pausaMin", "pausaTipo", "pausaProg", "pausaCumpl", "segunda", "horasAcad", "dependencia", "terapiaManual", "ayudas", "capacitacion", "transfiere", "actFisica", "trauma"];
   const fichaFalt = fichaReq.filter(k => f[k] == null || f[k] === "").length;
-  const copsoqN = Object.keys(r.m2.copsoq || {}).length;
+  const copsoqF = copsoqFalt(r);
   return [["Consentimiento", r.consent.participa === "si", "pendiente"], ["REBA (≥ 2 tareas)", tasksOk, "faltan tareas"], ["Check List OCRA", ocraOk, "pendiente"],
     ["PTAI", !!ptaiOk, "pendiente"], ["NASA-TLX", nasaScore(r) !== null, "incompleto"], ["Ficha", fichaFalt === 0, `faltan ${fichaFalt} datos`],
-    ["CENSOPAS-COPSOQ", copsoqN >= 31, S.settings.copsoqItems ? `${copsoqN}/31` : "pendiente (ítems oficiales)"], ["Satisfacción laboral", !!warrScore(r)?.total, "incompleto"],
+    ["CENSOPAS-COPSOQ", copsoqF === 0, `faltan ${copsoqF} de ${COPSOQ_ITEMS.length}`], ["Satisfacción laboral", !!warrScore(r)?.total, "incompleto"],
     ["Cuestionario Nórdico", smeRT(r) !== null, "incompleto"]];
 }
 function validate(id) {
@@ -1513,7 +1644,6 @@ const ADMIN_TABS = {
       return `<rect class="growv" x="${i * 40 + 8}" y="${110 - h}" width="24" height="${h}" rx="6" fill="#E11D48"/><text x="${i * 40 + 20}" y="${104 - h}" font-size="10" text-anchor="middle" fill="currentColor" font-weight="700">${days[k]}</text><text x="${i * 40 + 20}" y="128" font-size="8" text-anchor="middle" fill="currentColor">${k.slice(5)}</text>`; }).join("")}</svg>` : '<p class="hint">Aún no hay registros completos.</p>'}</div>
     <div class="card"><h3>Alertas</h3>
       ${venc.length ? `<div class="note ico" style="margin:8px 0">${ms("alarm")}<span>${venc.length} participante(s) con el momento 2 vencido (más de 7 días): <b>${venc.map(r => esc(r.code)).join(", ")}</b></span></div>` : ""}
-      ${!S.settings.copsoqItems ? '<div class="note ico" style="margin:8px 0">${ms("description")}<span>Los ítems oficiales del CENSOPAS-COPSOQ aún no se han cargado en este dispositivo.</span></div>' : ""}
       <div class="note info ico" style="margin:8px 0">${ms("fact_check")}<span>Doble puntuación ergonómica: seleccione entre ${Math.round(META * .1)} y ${Math.round(META * .2)} participantes (10-20 %) para la evaluación de concordancia.</span></div>
       ${noP.length ? `<div class="note info" style="margin:8px 0">Motivos de no participación: ${noP.map(r => esc(r.consent?.motivo || (r.status === "rechazo" ? "no acepta participar" : "no elegible"))).join(" · ")}</div>` : ""}</div>`;
   },
@@ -1559,7 +1689,6 @@ const ADMIN_TABS = {
       <label class="drop" id="drop"><input type="file" id="impFile" accept="application/json,.json" multiple hidden><span class="ms" style="font-size:40px;color:var(--primary)">upload_file</span><b>Toque para elegir o suelte los archivos aquí</b></label><div id="impMsg"></div></div>
     <div class="card"><h3>Exportar</h3><p class="hint">CSV con una fila por participante y todas las variables (compatible con Excel y SPSS). El respaldo JSON incluye fotografías.</p>
       <div class="grid g3"><button class="btn primary" id="expCsv">${ms("table_view")} CSV para análisis</button><button class="btn soft" id="expJson">${ms("download")} Respaldo JSON</button><button class="btn ghost" id="expDict">${ms("menu_book")} Diccionario de variables</button></div></div>
-    <div class="card"><h3>Ítems del CENSOPAS-COPSOQ</h3><p>${S.settings.copsoqItems ? '<span class="badge b-ok">Cargados en este dispositivo</span>' : '<span class="badge b-warn">Pendientes</span>'}</p><p class="hint">Cárguelos en la configuración de la encuesta cuando el INS-CENSOPAS los entregue.</p></div>
     <div class="card" style="border-color:var(--bad)"><h3 style="color:var(--bad)">Zona de riesgo</h3><p class="hint">Elimina todos los registros de este dispositivo (exporte un respaldo antes).</p><button class="btn danger" id="wipe">Eliminar todos los registros</button></div>`;
   },
   seg() {
@@ -1613,7 +1742,7 @@ function flat(r) {
   NASA.forEach(([k]) => o["nasa_" + k] = r.m1?.nasa?.[k] ?? ""); o.nasa_raw = s.nasa ?? "";
   ["edad", "sexo", "peso", "talla", "mano", "anioEgreso", "inicioInternado", "sede", "area", "antigAnios", "antigMeses", "horasDia", "diasSemana", "pacientesDia", "pausasN", "pausaMin", "pausaTipo", "pausaProg", "pausaCumpl", "segunda", "segundaHoras", "horasAcad", "dependencia", "terapiaManual", "ayudas", "capacitacion", "transfiere", "actFisica", "enfOtra", "trauma", "traumaReg"].forEach(k => o["f_" + k] = f[k] ?? "");
   o.f_enfermedades = Object.entries(f.enf || {}).filter(([, v]) => v).map(([k]) => k).join("|"); o.imc = s.imc ?? ""; o.horas_semana = s.hsem ?? "";
-  COPSOQ_DIMS.forEach(([d, , n]) => { for (let i = 0; i < n; i++) o[`copsoq_${d}_${i + 1}`] = r.m2?.copsoq?.[`${d}_${i}`] ?? ""; });
+  COPSOQ_ITEMS.forEach(it => o["copsoq_" + it.k] = copsoqVal(r, it));
   for (let i = 1; i <= 15; i++) o["warr_" + i] = r.m2?.warr?.["i" + i] ?? ""; o.warr_total = s.warr?.total ?? ""; o.warr_intr = s.warr?.intr ?? ""; o.warr_extr = s.warr?.extr ?? "";
   o.pausa_realizada = r.m2?.pausa?.done ? "si" : r.m2?.pausa?.omitida ? "omitida" : "";
   REGIONS.forEach(([id]) => { const n = r.m2?.nordico?.[id] || {}, m = r.m2?.modulo?.[id] || {}; o[`nord_${id}_12m`] = n.m12 || ""; o[`nord_${id}_lado`] = n.lado || ""; o[`nord_${id}_imp`] = n.imp || ""; o[`nord_${id}_7d`] = n.d7 || ""; o[`mod_${id}_atrib`] = m.atrib || ""; o[`mod_${id}_temp`] = m.temp || ""; });
@@ -1626,7 +1755,7 @@ async function exportCSV() { const rows = (await DB.all()).filter(r => r.code).m
   download(`SME-RT_datos_${new Date().toISOString().slice(0, 10)}.csv`, "﻿" + [cols.join(","), ...rows.map(r => cols.map(c => cell(r[c])).join(","))].join("\r\n"), "text/csv;charset=utf-8"); toast(`CSV exportado (${rows.length} registros)`); }
 function exportDict() { const d = [["Variable", "Descripción"], ["codigo", "Código del participante"], ["estrato", "Egresado / Interno"], ["t1..t3_reba", "Puntuación REBA por tarea (1-15)"], ["reba_max / reba_prom", "Regla a priori: máximo; sensibilidad: promedio"],
   ["ocra_der / ocra_izq / ocra_max", "Check List OCRA por miembro; máximo (regla a priori)"], ["ptai_verde/amarillo/rojo", "N.º de factores PTAI por zona (observación + entrevista)"], ["nasa_*", "Dimensiones NASA-TLX (0-20)"], ["nasa_raw", "Raw TLX = promedio × 5 (0-100)"],
-  ["f_*", "Ficha sociodemográfica y laboral (Anexo 4)"], ["imc / horas_semana", "Calculados"], ["copsoq_*", "Ítems CENSOPAS-COPSOQ (siempre…nunca)"], ["warr_1..15", "Escala Warr-Cook-Wall (1-7; NA = no aplica)"], ["warr_total/intr/extr", "Puntajes 15-105 / 7-49 / 8-56 (reescalados si hay NA)"],
+  ["f_*", "Ficha sociodemográfica y laboral (Anexo 4)"], ["imc / horas_semana", "Calculados"], ["copsoq_p1..p34", "CENSOPAS-COPSOQ versión media: pregunta y letra del ítem (p25a = 25.a); 4.b y 5.b con varias respuestas separadas por |"], ["warr_1..15", "Escala Warr-Cook-Wall (1-7; NA = no aplica)"], ["warr_total/intr/extr", "Puntajes 15-105 / 7-49 / 8-56 (reescalados si hay NA)"],
   ["nord_<región>_12m/lado/imp/7d", "Cuestionario Nórdico por región"], ["mod_<región>_atrib/temp", "Módulo de atribución laboral"], ["sme_rt_12m", "Desenlace primario: 1 = síntoma 12 m con atribución o temporalidad laboral"]];
   download("SME-RT_diccionario.csv", "﻿" + d.map(r => r.map(v => '"' + v + '"').join(",")).join("\r\n"), "text/csv;charset=utf-8"); }
 async function importFiles(files) { let n = 0, upd = 0, bad = 0; const cur = Object.fromEntries((await DB.all()).map(r => [r.code, r]));
@@ -1743,7 +1872,7 @@ function filaSheets(r, refs = []) {
   // NASA-TLX
   NASA.forEach(([k, t]) => add(`NASA-TLX: ${t} (0–20)`, r.m1?.nasa?.[k])); add("NASA-TLX: Puntaje global Raw (0–100)", s.nasa);
   // CENSOPAS-COPSOQ
-  COPSOQ_DIMS.forEach(([d, nm, n]) => { for (let i = 0; i < n; i++) add(`CENSOPAS-COPSOQ – ${nm} – ítem ${i + 1}`, r.m2?.copsoq?.[`${d}_${i}`]); });
+  COPSOQ_ITEMS.forEach(it => add(`CENSOPAS-COPSOQ P${it.n}. ${it.t}`, copsoqVal(r, it)));
   // Escala General de Satisfacción
   WARR.forEach((w, i) => { const v = r.m2?.warr?.["i" + (i + 1)]; add(`Warr P${i + 1}. Satisfacción con: ${w} (1–7)`, v === "NA" ? "No aplica" : v); });
   add("Warr: Satisfacción general (15–105)", s.warr?.total); add("Warr: Satisfacción intrínseca (7–49)", s.warr?.intr); add("Warr: Satisfacción extrínseca (8–56)", s.warr?.extr);

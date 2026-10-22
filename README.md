@@ -26,7 +26,7 @@ La barra superior tiene tres pestañas: **Inicio**, **Encuesta** y **Admin**.
   9. **NASA-TLX** (versión sin ponderación, de 0 a 20 puntos), con escala de color, ajuste − / + y perfil radar.
   10. Cierre del momento 1.
 - **Momento 2 (dentro de los 7 días siguientes):**
-  1. **CENSOPAS-COPSOQ**, versión corta. Los 31 ítems oficiales se cargan en Configuración.
+  1. **CENSOPAS-COPSOQ**, versión media (preguntas 25 a 34). Las preguntas de datos generales y de empleo (C3 a C24) están en la ficha del momento 1; las que ya estaban en la ficha (1, 2, 4.a, 5.a, 10 y 19) no se repiten.
   2. **Escala General de Satisfacción** (Warr, Cook y Wall), con escala deslizable de 1 a 7.
   3. Pausa de 5 minutos.
   4. **Cuestionario Nórdico**, con mapa corporal.
