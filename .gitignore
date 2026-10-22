@@ -1,0 +1,8 @@
+# datos de participantes: nunca se suben (Ley N.° 29733)
+exportaciones/
+fotos/
+*.csv
+*.json
+# archivos de trabajo locales
+*.backup.html
+Ejemplo.html
