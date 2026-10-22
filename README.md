@@ -44,7 +44,12 @@ Funciones de apoyo:
 
 ## Datos
 
-Las respuestas se guardan en el propio dispositivo (IndexedDB del navegador). Cada evaluador genera en «Enviar datos» un paquete `.json`, y el administrador lo importa en su panel. En el primer ingreso al panel se crea la contraseña de ese dispositivo.
+Las respuestas se guardan primero en el propio dispositivo (IndexedDB del navegador) y desde ahí se envían a **Google Sheets y Drive**. El servidor es `apps-script/Code.gs`; para instalarlo paso a paso, vea [`apps-script/LEEME.md`](apps-script/LEEME.md).
+
+- **Tabla «Encuestas»:** una fila por participante. La fila se actualiza al completar el momento 2.
+- **Tabla «Multimedia»:** una fila por foto. Los archivos se guardan en la carpeta de Drive del estudio.
+
+El envío es automático al cerrar cada momento, o manual desde **Enviar datos → Enviar pendientes**. Como respaldo, sigue disponible el paquete `.json`, que el administrador importa en su panel. En el primer ingreso al panel se crea la contraseña de ese dispositivo.
 
 ## Privacidad
 

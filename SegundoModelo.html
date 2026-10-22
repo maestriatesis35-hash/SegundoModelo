@@ -866,13 +866,21 @@ function configView() {
   <span class="kbd">{"exig":["ítem 1",…7], "dp":[…3], "ctrl":[…5], "apoyo":[…7], "comp":[…5], "capital":[…4]}</span></p>
   <p>${it ? '<span class="badge b-ok">Ítems cargados (' + Object.values(it).flat().length + ')</span>' : '<span class="badge b-warn">Pendiente: aún no se han cargado los ítems oficiales</span>'}</p>
   <input type="file" id="copsoqFile" accept="application/json">
+  <h3 style="margin-top:20px">Google Sheets y Drive</h3>
+  <p class="hint">Enlace de la aplicación web de Apps Script (termina en <span class="kbd">/exec</span>). Ver <span class="kbd">apps-script/LEEME.md</span>.</p>
+  <div style="display:flex;gap:8px"><input type="text" id="gsUrl" value="${esc(gsUrl())}" placeholder="https://script.google.com/macros/s/…/exec" inputmode="url" autocapitalize="off" spellcheck="false">
+    <button type="button" class="btn ghost" id="gsTest" style="flex:none">${ms("wifi_tethering")} Probar</button></div>
+  <p class="hint" id="gsTestMsg" style="margin-top:6px"></p>
   <div style="margin-top:20px"><button class="btn primary" id="saveCfg">Guardar</button></div></div></div>`;
 }
 function bindConfig() {
   $("#homeBtn").onclick = () => { S.view = "home"; render(); };
   $("#copsoqFile").onchange = async e => { try { const j = JSON.parse(await e.target.files[0].text()); const ok = COPSOQ_DIMS.every(([k, , n]) => Array.isArray(j[k]) && j[k].length === n);
     if (!ok) return toast("El archivo no tiene 7/3/5/7/5/4 ítems por dimensión"); S.settings.copsoqItems = j; LS.set("settings", S.settings); toast("Ítems cargados"); render(); } catch { toast("Archivo JSON no válido"); } };
-  $("#saveCfg").onclick = () => { S.settings.encuestador = $("#encName").value.trim(); LS.set("settings", S.settings); toast("Configuración guardada"); S.view = "home"; render(); };
+  $("#gsTest").onclick = async () => { const m = $("#gsTestMsg"), prev = S.settings.gsUrl; S.settings.gsUrl = $("#gsUrl").value.trim(); m.textContent = "Probando…";
+    try { const j = await gsCall({ action: "estado" }); m.textContent = j.configurado ? "Conectado: la base de datos responde." : "El servidor responde, pero falta ejecutar configurar() en Apps Script."; }
+    catch (e) { m.textContent = "No se pudo conectar: " + e.message; } finally { S.settings.gsUrl = prev; } };
+  $("#saveCfg").onclick = () => { S.settings.encuestador = $("#encName").value.trim(); S.settings.gsUrl = $("#gsUrl").value.trim(); LS.set("settings", S.settings); toast("Configuración guardada"); S.view = "home"; render(); };
 }
 
 /* ---------- Pasos ---------- */
@@ -1335,7 +1343,7 @@ function bindStep(id) {
       // tocar la escala en el valor que ya tenía (10) también cuenta como respuesta
       r.addEventListener("pointerup", () => { if (r.dataset.touched !== "true") setV(+r.value); });
       r.addEventListener("keyup", e => { if (["Enter", " ", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key) && r.dataset.touched !== "true") setV(+r.value); }); }); }
-  if (id === "fin1") { playLottie($("#lotFin1"), "check", "#0D9488"); S.rec.status = "m1"; S.rec.m1.doneAt = S.rec.m1.doneAt || now(); autosave();
+  if (id === "fin1") { playLottie($("#lotFin1"), "check", "#0D9488"); S.rec.status = "m1"; S.rec.m1.doneAt = S.rec.m1.doneAt || now(); autosave(); { const c = S.rec.code; setTimeout(() => gsAuto(c), 900); }
     $("#saveExit").onclick = async () => { await DB.put(S.rec); toast("Momento 1 guardado"); S.view = "home"; render(); }; }
   if (id === "ficha") fichaUpd();
   if (id === "warr") { warrUpd();
@@ -1361,15 +1369,15 @@ $("#nextBtn").onclick = async () => {
   const id = STEPS[S.step].id;
   if (id === "pres" && !S.settings.encuestador) { $("#encName2")?.focus(); return toast("Escriba el nombre del encuestador/evaluador"); }
   const err = validate(id);
-  if (err === "NO_ELEGIBLE") { if (confirm("El participante no es elegible:\n" + elegFails().map(c => `• ${c[1] === "inc" ? "No cumple inclusión" : "Cumple exclusión"}: ${critText(c[0])}`).join("\n") + "\n\n¿Registrar como no elegible y volver al inicio?")) { S.rec.status = "no_elegible"; if (S.rec.code) await DB.put(S.rec); S.view = "home"; render(); } return; }
-  if (err === "RECHAZO") { const m = prompt("Registre el motivo de no participación (opcional):") || ""; S.rec.status = "rechazo"; S.rec.consent.motivo = m; await DB.put(S.rec); toast("No participación registrada"); S.view = "home"; return render(); }
+  if (err === "NO_ELEGIBLE") { if (confirm("El participante no es elegible:\n" + elegFails().map(c => `• ${c[1] === "inc" ? "No cumple inclusión" : "Cumple exclusión"}: ${critText(c[0])}`).join("\n") + "\n\n¿Registrar como no elegible y volver al inicio?")) { S.rec.status = "no_elegible"; if (S.rec.code) { await DB.put(S.rec); gsAuto(S.rec.code); } S.view = "home"; render(); } return; }
+  if (err === "RECHAZO") { const m = prompt("Registre el motivo de no participación (opcional):") || ""; S.rec.status = "rechazo"; S.rec.consent.motivo = m; await DB.put(S.rec); gsAuto(S.rec.code); toast("No participación registrada"); S.view = "home"; return render(); }
   if (err) { markMissing(); if (id === "obs") { rebaFalta(true); const m = $("#stepBody .miss"); if (m) { m.closest("details")?.setAttribute("open", ""); m.scrollIntoView({ behavior: "smooth", block: "center" }); } } return toast(err); }
   // el participante puede no responder: se avisa de lo que falta y un segundo toque continúa
   const falta = reqQs().filter(q => !answered(q)).length;
   if (falta && S._skipOk !== id) { S._skipOk = id; markMissing(); return toast(`Faltan ${falta} pregunta(s): pulse «Siguiente» otra vez para continuar sin responderlas`); }
   S._skipOk = null;
   if (id === "pres") { const ex = (await DB.all()).find(x => x.code === S.rec.code && x.createdAt !== S.rec.createdAt); if (ex) { markUsed(ex.code); toast("Ese código ya existía: se generó otro"); return assignCode(); } markUsed(S.rec.code); }
-  if (id === "rev") { S.rec.status = "completo"; S.rec.m2.doneAt = now(); await DB.put(S.rec); $("#stepBody").innerHTML = `<div class="card view" style="text-align:center"><div id="okLot" class="lot sm"></div><h2>¡Registro completo!</h2><p>Gracias por su participación. Ahora puede enviar los datos al administrador.</p><div class="grid g2"><button class="btn primary" id="goSend">${ms("send")} Ir a enviar</button><button class="btn ghost" id="goHome">Volver al inicio</button></div></div>`;
+  if (id === "rev") { S.rec.status = "completo"; S.rec.m2.doneAt = now(); await DB.put(S.rec); gsAuto(S.rec.code); $("#stepBody").innerHTML = `<div class="card view" style="text-align:center"><div id="okLot" class="lot sm"></div><h2>¡Registro completo!</h2><p>Gracias por su participación. Ahora puede enviar los datos al administrador.</p><div class="grid g2"><button class="btn primary" id="goSend">${ms("send")} Ir a enviar</button><button class="btn ghost" id="goHome">Volver al inicio</button></div></div>`;
     playLottie($("#okLot"), "check", "#0D9488"); $("#nav").hidden = true; $("#goSend").onclick = () => { S.view = "send"; render(); }; $("#goHome").onclick = () => { S.view = "home"; render(); }; return; }
   S.step++; S.rec.lastStep = S.step; if (S.rec.code) await DB.put(S.rec); render(); scrollTo({ top: 0, behavior: "smooth" });
 };
@@ -1381,8 +1389,14 @@ async function sendView() {
   <div class="hero" style="margin-top:10px"><div><h2>Enviar datos al administrador</h2>
   <p class="hint">Se genera un <b>paquete cifrable</b> (.json) con los registros seleccionados y sus fotografías. Compártalo por el medio institucional acordado (correo, Drive o USB); el administrador lo importa en el panel. El paquete no contiene nombres, DNI ni firmas.</p></div><div id="sendLot" class="lot sm"></div></div>
   <div class="list">${recs.map(r => `<label class="it"><input type="checkbox" data-sel="${esc(r.code)}" ${!r.sent && (r.status === "completo" || r.status === "m1" || r.status === "rechazo" || r.status === "no_elegible") ? "checked" : ""} style="width:22px;height:22px">
-    <div style="flex:1"><b>${esc(r.code)}</b><div class="hint">${esc(r.status)}${r.sent ? " · enviado " + new Date(r.sentAt).toLocaleDateString() : ""}</div></div></label>`).join("") || '<p class="hint">No hay registros.</p>'}</div>
-  <div class="grid g2"><button class="btn primary" id="doSend">${ms("send")} Generar y compartir paquete</button><button class="btn ghost" id="doBackup">${ms("download")} Copia de seguridad completa</button></div></div></div>`;
+    <div style="flex:1"><b>${esc(r.code)}</b><div class="hint">${esc(ESTADOS[r.status] || r.status)}${r.sent ? " · enviado " + new Date(r.sentAt).toLocaleDateString("es-PE") : ""}</div></div></label>`).join("") || '<p class="hint">No hay registros.</p>'}</div>
+  <div class="grid g2"><button class="btn primary" id="doSend">${ms("send")} Generar y compartir paquete</button><button class="btn ghost" id="doBackup">${ms("download")} Copia de seguridad completa</button></div></div>
+  <div class="card"><h2 style="display:flex;align-items:center;gap:10px"><span class="tile t-accent" style="width:40px;height:40px;border-radius:12px">${ms("cloud_upload")}</span>Google Sheets y Drive</h2>
+  ${gsUrl() ? `<p class="hint">Las respuestas van a la tabla «Encuestas» y las fotos a la carpeta de Drive del estudio. Se envía solo lo nuevo o modificado; reintentar no duplica filas ni fotos.</p>
+    <div class="list">${recs.map(r => `<div class="it" style="cursor:default"><div style="flex:1"><b class="mono">${esc(r.code)}</b><div class="hint">${esc(ESTADOS[r.status] || r.status)} · ${fotosDe(r).length} foto(s)</div></div>${gsPend(r) ? '<span class="badge b-warn">Pendiente</span>' : `<span class="badge b-ok">Enviado ${new Date(r.gs.at).toLocaleDateString("es-PE")}</span>`}</div>`).join("") || '<p class="hint">No hay registros.</p>'}</div>
+    <div id="gsMsg" aria-live="polite" class="hint" style="margin:8px 0"></div>
+    <button class="btn accent block" id="gsSend" ${recs.some(gsPend) ? "" : "disabled"}>${ms("cloud_upload")} Enviar pendientes (${recs.filter(gsPend).length})</button>`
+  : `<div class="note">Aún no está configurado el enlace del servidor. Ingréselo en <b>Configuración</b> (lo entrega quien instaló el Apps Script).</div>`}</div></div>`;
 }
 function bindSend() {
   playLottie($("#sendLot"), "send", "#E11D48");
@@ -1396,6 +1410,12 @@ function bindSend() {
   $("#doSend").onclick = async () => { const codes = $$("[data-sel]").filter(x => x.checked).map(x => x.dataset.sel); if (!codes.length) return toast("Seleccione al menos un registro");
     const ok = await share(await pack(codes, false)); if (!ok) return;
     for (const r of (await DB.all()).filter(r => codes.includes(r.code))) { r.sent = true; r.sentAt = now(); await DB.put(r); } toast(`Paquete generado (${codes.length} registros)`); render(); };
+  if ($("#gsSend")) $("#gsSend").onclick = async () => {
+    if (!navigator.onLine) return toast("Sin conexión: los datos siguen guardados en el dispositivo");
+    const b = $("#gsSend"), msg = $("#gsMsg"); b.disabled = true; let ok = 0, fallo = null;
+    for (const code of (await DB.all()).filter(gsPend).map(r => r.code)) {
+      try { await gsEnviar(await gsRec(code), t => msg.textContent = t); ok++; } catch (e) { fallo = `${code}: ${e.message}`; break; } }
+    toast(fallo ? `Enviados ${ok}; se detuvo en ${fallo}` : `Enviados ${ok} registro(s) a Google Sheets`); render(); };
   $("#doBackup").onclick = async () => { const all = await DB.all(); await share({ app: "SME-RT", tipo: "respaldo", exportedAt: now(), encuestador: S.settings.encuestador, records: all }); };
 }
 
@@ -1633,6 +1653,144 @@ function bindAdmin() {
     $("#wipe").onclick = async () => { if (prompt('Escriba BORRAR para eliminar todos los registros de este dispositivo') !== "BORRAR") return; for (const r of await DB.all()) await DB.del(r.code); toast("Registros eliminados"); render(); }; }
   if (t === "seg") $("#pwChange").onclick = async () => { const has = LS.get("admHash", null); if (await hashPw($("#pwOld").value) !== has) return toast("La contraseña actual no es correcta");
     const a = $("#pwNew").value, b = $("#pwNew2").value; if (a.length < 6) return toast("Mínimo 6 caracteres"); if (a !== b) return toast("Las contraseñas no coinciden"); LS.set("admHash", await hashPw(a)); toast("Contraseña actualizada"); render(); };
+}
+
+/* =================== Envío a Google Sheets y Drive (formato V1 del estudio) ===================
+   Tabla «Encuestas»: una fila por participante, con el nombre completo de cada dato; si el registro cambia
+   (por ejemplo, al completar el momento 2) la misma fila se actualiza. Tabla «Multimedia»: una fila por foto,
+   y el archivo va a la carpeta de Drive del estudio (Multimedia/Egresado o Multimedia/Interno).
+   El servidor es apps-script/Code.gs; su URL /exec va en GS_URL o en Configuración. */
+const GS_URL = "https://script.google.com/macros/s/AKfycbxQS6J32x_YDJWLprXld-dU0npb5zVU4ylxCwuqX_bEsOrwPsxV5hNZKYFzALXvvYUI/exec";
+const gsUrl = () => String(S.settings.gsUrl || GS_URL || "").trim();
+const envioId = r => `${r.code}_${Date.parse(r.createdAt) || 0}`;
+const ESTADOS = { nuevo: "En curso", m1: "Momento 1 completo", completo: "Completo (momentos 1 y 2)", rechazo: "No acepta participar", no_elegible: "No elegible" };
+const yn = v => v === "si" || v === true ? "Sí" : v === "no" ? "No" : v === "ns" ? "No sabe" : v === false ? "" : (v ?? "");
+const b01 = v => v ? 1 : 0;
+const fh = v => v ? new Date(v).toLocaleString("es-PE") : "";
+// texto fijo de cada criterio (no depende del participante abierto en pantalla)
+const CRIT_TXT = { listado: "Figura en el listado institucional de elegibles", atencion: "Egresado/a 2020-2025 con atención directa de pacientes, o interno/a 2026, en un establecimiento de Chulucanas o Piura",
+  tresMeses: "Tiene al menos 3 meses continuos de actividad asistencial", ejecuta: "Participa en la ejecución del estudio como encuestador o evaluador" };
+// fotos del registro, cada una con un identificador estable para no subirla dos veces
+function fotosDe(r) {
+  const id = envioId(r), out = [];
+  (r.m1?.tasks || []).forEach((t, ti) => (t?.photos || []).forEach((p, pi) => out.push({ id: `${id}_t${ti + 1}_${Date.parse(p.at) || pi}`, p, paso: `REBA Tarea ${ti + 1}`, tarea: t.tipo || "" })));
+  (r.fotosPaso || []).forEach(p => out.push({ id: `${id}_${p.k}`, p, paso: "Foto general – " + (STEPS.find(s => s.id === p.paso)?.t || p.paso), tarea: "" }));
+  return out;
+}
+// fila de «Encuestas»: pares [encabezado, valor] siempre en el mismo orden (las columnas no dependen de los datos)
+function filaSheets(r, refs = []) {
+  const C = [], add = (c, v) => C.push([c, v ?? ""]), s = summary(r), f = r.m2?.ficha || {}, e = r.eleg || {}, c = r.consent || {};
+  add("ID de la encuesta", envioId(r)); add("Fecha y hora de registro en Google Sheets", "");
+  add("Código del participante", r.code); add("Estrato", r.estrato); add("Estado de la encuesta", ESTADOS[r.status] || r.status);
+  add("Evaluador", r.encuestador); add("Fecha y hora de inicio", fh(r.createdAt)); add("Momento 1: fecha y hora de cierre", fh(r.m1?.doneAt));
+  add("Momento 2: fecha programada", r.m2?.fechaProg); add("Momento 2: hora programada", r.m2?.horaProg); add("Momento 2: fecha y hora de cierre", fh(r.m2?.doneAt));
+  add("Fecha y hora de envío", fh(new Date()));
+  // consentimiento y criterios
+  add("Consentimiento: ¿Acepta participar?", yn(c.participa)); add("Consentimiento: ¿Autoriza fotografías de sus posturas?", yn(c.fotos));
+  add("Consentimiento: Firmó la hoja impresa (Anexo 2)", c.papel ? "Sí" : ""); add("Consentimiento: Motivo de no participación", c.motivo);
+  ELEG_CRIT.forEach(([k, t]) => add(`Criterio de ${t === "inc" ? "inclusión" : "exclusión"}: ${CRIT_TXT[k]}`, yn(e[k])));
+  const fails = elegFailsDe(r);
+  add("Criterios: Resultado de elegibilidad", ELEG_CRIT.some(([k]) => !e[k]) ? "Incompleto" : fails.length ? "No elegible" : "Elegible");
+  add("Criterios: Motivos de no elegibilidad", fails.map(([k, t]) => `${t === "inc" ? "No cumple inclusión" : "Cumple exclusión"}: ${CRIT_TXT[k]}`).join(" | "));
+  // ficha sociodemográfica y laboral
+  [["edad", "2. Edad (años)"], ["sexo", "3. Sexo"], ["peso", "4. Peso (kg)"], ["talla", "5. Talla (m)"], ["mano", "6. Mano dominante"], ["anioEgreso", "8. Año de egreso"],
+   ["inicioInternado", "8. Fecha de inicio del internado"], ["sede", "9. Sede o centro asistencial donde realiza su actividad"], ["area", "10. Área asistencial principal"],
+   ["antigAnios", "11. Tiempo en actividad asistencial (años)"], ["antigMeses", "11. Tiempo en actividad asistencial (meses)"], ["horasDia", "12. ¿Cuántas horas trabaja durante el día?"],
+   ["diasSemana", "13. ¿Cuántos días a la semana realiza actividad asistencial?"], ["pacientesDia", "14. ¿Cuántos pacientes atiende en promedio por día?"],
+   ["pausasN", "15. ¿Cuántas pausas activas realiza durante su turno?"], ["pausaMin", "16. ¿Cuántos minutos en promedio dura su pausa activa?"],
+   ["pausaTipo", "16a. ¿Qué tipo de pausas realiza principalmente?"], ["pausaProg", "16b. ¿Su establecimiento tiene pausas programadas durante el turno?"],
+   ["pausaCumpl", "16c. ¿Con qué frecuencia logra realizar las pausas que le corresponden?"], ["segunda", "17. ¿Tiene otro trabajo u ocupación además de esta actividad asistencial?"],
+   ["segundaHoras", "17. Horas por semana de la segunda ocupación"], ["horasAcad", "17a. ¿Cuántas horas a la semana dedica a actividades académicas?"],
+   ["dependencia", "18. Nivel de dependencia predominante de los pacientes que atiende"], ["terapiaManual", "19. ¿Con qué frecuencia utiliza técnicas de terapia manual durante su jornada?"],
+   ["ayudas", "20. ¿Dispone de ayudas mecánicas para movilizar pacientes?"], ["capacitacion", "21. ¿Ha recibido capacitación en ergonomía o mecánica corporal en el último año?"],
+   ["transfiere", "21a. ¿Realiza transferencias o movilización de pacientes dependientes?"], ["actFisica", "22. Días por semana de actividad física o deporte (≥ 30 minutos)"]
+  ].forEach(([k, l]) => add("Ficha: " + l, yn(f[k])));
+  add("Ficha: 23. Enfermedades diagnosticadas por un médico", Object.entries(f.enf || {}).filter(([, v]) => v).map(([k]) => k).join(", "));
+  add("Ficha: 23. Otra enfermedad (¿cuál?)", f.enfOtra);
+  add("Ficha: 24. Traumatismo fuera del trabajo con dolor musculoesquelético (12 meses)", yn(f.trauma)); add("Ficha: 24. Región afectada", f.traumaReg);
+  add("Ficha: Índice de masa corporal (kg/m²)", s.imc); add("Ficha: Horas asistenciales por semana", s.hsem);
+  // REBA por tarea
+  const RB = [["tronco", "Tronco (puntaje 1–4)"], ["troncoAj", "Tronco con torsión o inclinación lateral (1 = sí)", 1], ["cuello", "Cuello (puntaje 1–2)"], ["cuelloAj", "Cuello con torsión o inclinación lateral (1 = sí)", 1],
+    ["piernas", "Piernas (puntaje 1–2)"], ["piernasAj", "Flexión de rodillas (puntaje 0–2)"], ["carga", "Carga o fuerza (puntaje 0–2)"], ["cargaBrusca", "Fuerza brusca o instantánea (1 = sí)", 1],
+    ["brazo", "Brazo (puntaje 1–4)"], ["brazoAbd", "Brazo en abducción o rotación (1 = sí)", 1], ["hombroElev", "Hombro elevado (1 = sí)", 1], ["brazoApoyo", "Brazo apoyado o a favor de la gravedad (1 = sí)", 1],
+    ["antebrazo", "Antebrazo (puntaje 1–2)"], ["muneca", "Muñeca (puntaje 1–2)"], ["munecaAj", "Muñeca con desviación o torsión (1 = sí)", 1], ["agarre", "Agarre (puntaje 0–3)"],
+    ["actEstatica", "Una o más partes del cuerpo estáticas más de 1 minuto (1 = sí)", 1], ["actRepetida", "Movimientos repetidos más de 4 veces por minuto (1 = sí)", 1], ["actBrusca", "Cambios posturales bruscos o base inestable (1 = sí)", 1]];
+  [0, 1, 2].forEach(i => { const t = r.m1?.tasks?.[i] || {}, rb = t.reba || {}, k = rebaCalc(rb), P = `REBA Tarea ${i + 1} – `;
+    add(P + "Tipo de tarea", t.tipo); add(P + "Descripción breve", t.desc); add(P + "Ciclos observados", t.ciclos); add(P + "Lado evaluado", t.lado);
+    RB.forEach(([key, l, bin]) => add(P + l, bin ? (rb[key] ? 1 : (k ? 0 : "")) : rb[key]));
+    add(P + "Puntaje A (tabla A + carga)", k?.A); add(P + "Puntaje B (tabla B + agarre)", k?.B); add(P + "Puntaje C (tabla C)", k?.C);
+    add(P + "Puntaje de actividad", k ? (+rb.actEstatica || 0) + (+rb.actRepetida || 0) + (+rb.actBrusca || 0) : ""); add(P + "Puntaje total (1–15)", k?.total); add(P + "Nivel de riesgo", k?.level[1]); });
+  add("REBA: Puntaje máximo (regla a priori)", s.rebaMax); add("REBA: Puntaje promedio (sensibilidad)", s.rebaMean); add("REBA: Nivel de riesgo del puntaje máximo", s.rebaMax != null ? rebaLevel(s.rebaMax)[1] : "");
+  // Check List OCRA
+  [["der", "derecho"], ["izq", "izquierdo"]].forEach(([sd, nm]) => { const o = r.m1?.ocra?.[sd] || {}, k = ocraCalc(o), P = `OCRA miembro superior ${nm} – `;
+    [["recuperacion", "Factor recuperación"], ["frecuencia", "Factor frecuencia"], ["fuerza", "Factor fuerza"], ["postura", "Factor postura (máximo)"], ["complementarios", "Factores complementarios"], ["multiplicador", "Multiplicador de duración"]]
+      .forEach(([key, l]) => add(P + l, o[key])); add(P + "Puntaje", k?.total); add(P + "Nivel de riesgo", k?.band[1]); });
+  add("OCRA: Puntaje máximo (regla a priori)", s.ocraMax);
+  // PTAI: observación de transferencias y entrevista
+  const pt = r.m1?.ptai || {}, zona = cl => ({ g: "Verde (en orden)", y: "Amarilla (parcial)", r: "Roja (no en orden)" })[cl] || "";
+  add("PTAI: ¿Realiza transferencias de pacientes en su jornada?", pt.aplica === "si" ? "Sí" : pt.aplica === "no" ? "No (no aplicable)" : "");
+  [0, 1].forEach(ti => { const tr = pt.transfers?.[ti] || {}, P = `PTAI Transferencia ${ti + 1} – `;
+    add(P + "Tipo de transferencia", tr.tipo); add(P + "Nivel funcional del paciente", tr.nivel); add(P + "Ayudas utilizadas", tr.ayudas); add(P + "N.º de asistentes", tr.asistentes);
+    PTAI_OBS.forEach(([fac, crit], fi) => { const v = crit.map((_, ci) => !!tr.crit?.[`f${fi}_${ci}`]);
+      crit.forEach((cr, ci) => add(`${P}${fac}: ${cr} (1 = cumple)`, pt.aplica === "si" && ti < (pt.transfers || []).length ? b01(v[ci]) : ""));
+      add(`${P}${fac}: zona`, pt.aplica === "si" && ti < (pt.transfers || []).length ? zona(ptaiClass(v)) : ""); });
+    add(P + "Comentarios", tr.coment); });
+  PTAI_INT.forEach(([fac, qs], fi) => { qs.forEach((qq, i) => add(`PTAI ${fac}: ${qq}`, yn(pt.int?.[`i${fi}_${i}`])));
+    const v = qs.map((_, i) => pt.int?.[`i${fi}_${i}`] === "si"); add(`PTAI ${fac}: zona`, qs.some((_, i) => pt.int?.[`i${fi}_${i}`]) ? zona(ptaiClass(v)) : ""); });
+  PTAI_ABC.forEach(([fac, os], fi) => { const v = pt.int?.[`abc${fi}`]; add(`PTAI ${fac}`, v ? os["abc".indexOf(v)] : ""); });
+  const pz = s.ptai && s.ptai !== "No aplica" ? s.ptai : null;
+  add("PTAI: Factores en zona verde", pz?.g); add("PTAI: Factores en zona amarilla", pz?.y); add("PTAI: Factores en zona roja", pz?.r);
+  // NASA-TLX
+  NASA.forEach(([k, t]) => add(`NASA-TLX: ${t} (0–20)`, r.m1?.nasa?.[k])); add("NASA-TLX: Puntaje global Raw (0–100)", s.nasa);
+  // CENSOPAS-COPSOQ
+  COPSOQ_DIMS.forEach(([d, nm, n]) => { for (let i = 0; i < n; i++) add(`CENSOPAS-COPSOQ – ${nm} – ítem ${i + 1}`, r.m2?.copsoq?.[`${d}_${i}`]); });
+  // Escala General de Satisfacción
+  WARR.forEach((w, i) => { const v = r.m2?.warr?.["i" + (i + 1)]; add(`Warr P${i + 1}. Satisfacción con: ${w} (1–7)`, v === "NA" ? "No aplica" : v); });
+  add("Warr: Satisfacción general (15–105)", s.warr?.total); add("Warr: Satisfacción intrínseca (7–49)", s.warr?.intr); add("Warr: Satisfacción extrínseca (8–56)", s.warr?.extr);
+  add("Pausa de 5 minutos", r.m2?.pausa?.done ? "Realizada" : r.m2?.pausa?.omitida ? "Omitida" : "");
+  // Cuestionario Nórdico y módulo de atribución laboral
+  REGIONS.forEach(([id, nm, side]) => { const n = r.m2?.nordico?.[id] || {}, m = r.m2?.modulo?.[id] || {};
+    add(`Nórdico – ${nm}: ¿Problemas en los últimos 12 meses?`, yn(n.m12)); if (side) add(`Nórdico – ${nm}: Lado`, n.lado);
+    add(`Nórdico – ${nm}: ¿Le impidió realizar sus actividades normales (12 meses)?`, yn(n.imp)); add(`Nórdico – ${nm}: ¿Problemas en los últimos 7 días?`, yn(n.d7));
+    add(`Módulo de atribución – ${nm}: ¿Relacionada con su actividad asistencial?`, yn(m.atrib));
+    add(`Módulo de atribución – ${nm}: ¿Se inició o empeoró después de iniciar la actividad asistencial?`, yn(m.temp)); });
+  add("Nórdico: Regiones con síntomas en los últimos 12 meses", REGIONS.filter(([id]) => r.m2?.nordico?.[id]?.m12 === "si").map(x => x[1]).join(", "));
+  add("SME-RT: Desenlace primario a 12 meses (1 = sí)", s.sme === null ? "" : b01(s.sme));
+  // fotos
+  add("Número de fotos", refs.length); add("IDs de las fotos en Drive", refs.map(x => x.archivo).join(", ")); add("Enlaces de las fotos en Drive", refs.map(x => x.url).join(" "));
+  add("Datos completos (JSON, no editar)", "");
+  return { cols: C.map(x => x[0]), vals: C.map(x => x[1]) };
+}
+// criterios no cumplidos de cualquier registro (elegFails usa el registro abierto)
+const elegFailsDe = r => ELEG_CRIT.filter(([k, , , , ok]) => r.eleg?.[k] && r.eleg[k] !== ok);
+// pendiente de envío: nunca enviado o con cambios posteriores al último envío
+const gsPend = r => r.code && (!r.gs?.at || (r.updatedAt || "") > r.gs.at);
+async function gsCall(req) {
+  const url = gsUrl(); if (!url) throw Object.assign(new Error("Falta el enlace del servidor de Google (Configuración)"), { code: "config" });
+  const res = await fetch(url, { method: "POST", body: JSON.stringify(req) });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const j = await res.json(); if (!j.ok) throw Object.assign(new Error(j.error || "Error del servidor"), { code: j.code }); return j;
+}
+// envía un registro: primero sus fotos (solo las que faltan) y luego su fila; reintentar no duplica nada
+async function gsEnviar(r, avisar = () => {}) {
+  const id = envioId(r), fotos = fotosDe(r); r.gs = r.gs || {}; r.gs.fotos = r.gs.fotos || {};
+  for (let i = 0; i < fotos.length; i++) { const f = fotos[i]; if (r.gs.fotos[f.id]) continue;
+    avisar(`${r.code}: subiendo foto ${i + 1} de ${fotos.length} a Drive…`);
+    const j = await gsCall({ action: "subirFoto", foto: { id: f.id, encuesta: id, codigo: r.code, estrato: r.estrato, evaluador: f.p.encuestador || r.encuestador, paso: f.paso, tarea: f.tarea, ts: f.p.at, data: f.p.data } });
+    r.gs.fotos[f.id] = { archivo: j.archivo, url: j.url }; await DB.putRaw(r); }
+  avisar(`${r.code}: guardando en la tabla «Encuestas»…`);
+  const refs = fotos.map(f => r.gs.fotos[f.id]).filter(Boolean);
+  const rec = JSON.parse(JSON.stringify(r, (k, v) => k === "data" ? undefined : v));
+  await gsCall({ action: "guardarEncuesta", rec: Object.assign(rec, { id }), fila: filaSheets(r, refs) });
+  r.gs.at = new Date().toISOString(); r.gs.ok = true; await DB.putRaw(r);
+}
+// el participante abierto en pantalla se usa tal cual (así el autoguardado no borra la marca de envío)
+const gsRec = async code => S.rec?.code === code ? S.rec : (await DB.all()).find(x => x.code === code);
+// envío automático y silencioso al cerrar cada momento o al registrar un rechazo (si hay conexión y servidor)
+async function gsAuto(code) {
+  if (!gsUrl() || !navigator.onLine) return;
+  try { const r = await gsRec(code); if (r && gsPend(r)) { await gsEnviar(r); toast(`${code} enviado a Google Sheets`); } }
+  catch { /* queda pendiente; se reintenta desde «Enviar datos» */ }
 }
 
 /* =================== Modo audio (como Ejemplo): escuchar cada pregunta y responder con la voz ===================
